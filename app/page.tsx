@@ -19,6 +19,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [text, setText] = useState('');
 
+  // Handle user auth
   useEffect(() => {
     let isMounted = true;
 
@@ -38,6 +39,7 @@ export default function Home() {
     };
   }, []);
 
+  // Load tasks + subscribe to realtime updates
   useEffect(() => {
     if (!user) return;
 
@@ -77,17 +79,34 @@ export default function Home() {
     };
   }, [user]);
 
+  // ✅ Now with instant update
   const addTask = async () => {
     if (!text.trim() || !user) return;
-    await supabase.from('tasks').insert({
+    const { data, error } = await supabase.from('tasks').insert({
       content: text.trim(),
       owner_id: user.id,
-    });
+    }).select();
+
+    if (data && data[0]) {
+      setTasks((prev) => [...prev, data[0]]);
+    }
+
     setText('');
   };
 
+  // ✅ Instant update after checking
   const toggleTask = async (id: string, completed: boolean) => {
-    await supabase.from('tasks').update({ completed }).eq('id', id);
+    const { data } = await supabase
+      .from('tasks')
+      .update({ completed })
+      .eq('id', id)
+      .select();
+
+    if (data && data[0]) {
+      setTasks((prev) =>
+        prev.map((task) => (task.id === id ? { ...task, completed } : task))
+      );
+    }
   };
 
   const logout = async () => {
@@ -106,6 +125,7 @@ export default function Home() {
     return (
       <div style={{ padding: 40, textAlign: 'center' }}>
         <h2>QuickSync List</h2>
+        <p>Sign in to continue</p>
         <button onClick={login}>Sign In with Email</button>
       </div>
     );
@@ -130,7 +150,7 @@ export default function Home() {
       </div>
       <ul style={{ marginTop: 30 }}>
         {tasks.map((task) => (
-          <li key={task.id}>
+          <li key={task.id} style={{ marginBottom: 10 }}>
             <label>
               <input
                 type="checkbox"
