@@ -81,18 +81,19 @@ export default function Home() {
 
   // ✅ Now with instant update
   const addTask = async () => {
-    if (!text.trim() || !user) return;
-    const { data, error } = await supabase.from('tasks').insert({
-      content: text.trim(),
-      owner_id: user.id,
-    }).select();
+  if (!text.trim() || !user) return;
+  const { data } = await supabase.from('tasks').insert({
+    content: text.trim(),
+    owner_id: user.id,
+  }).select();
 
-    if (data && data[0]) {
-      setTasks((prev) => [...prev, data[0]]);
-    }
+  if (data && data[0]) {
+    setTasks((prev) => [...prev, data[0]]);
+  }
 
-    setText('');
-  };
+  setText('');
+};
+
 
   // ✅ Instant update after checking
   const toggleTask = async (id: string, completed: boolean) => {
