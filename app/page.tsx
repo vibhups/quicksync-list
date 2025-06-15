@@ -1,51 +1,139 @@
-import { DeployButton } from "@/components/deploy-button";
-import { EnvVarWarning } from "@/components/env-var-warning";
-import { AuthButton } from "@/components/auth-button";
-import { Hero } from "@/components/hero";
-import { ThemeSwitcher } from "@/components/theme-switcher";
-import { ConnectSupabaseSteps } from "@/components/tutorial/connect-supabase-steps";
-import { SignUpUserSteps } from "@/components/tutorial/sign-up-user-steps";
-import { hasEnvVars } from "@/lib/utils";
-import Link from "next/link";
+'use client';
+import { useEffect, useState } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+type Task = {
+  id: string;
+  content: string;
+  completed: boolean;
+};
 
 export default function Home() {
-  return (
-    <main className="min-h-screen flex flex-col items-center">
-      <div className="flex-1 w-full flex flex-col gap-20 items-center">
-        <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
-          <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm">
-            <div className="flex gap-5 items-center font-semibold">
-              <Link href={"/"}>Next.js Supabase Starter</Link>
-              <div className="flex items-center gap-2">
-                <DeployButton />
-              </div>
-            </div>
-            {!hasEnvVars ? <EnvVarWarning /> : <AuthButton />}
-          </div>
-        </nav>
-        <div className="flex-1 flex flex-col gap-20 max-w-5xl p-5">
-          <Hero />
-          <main className="flex-1 flex flex-col gap-6 px-4">
-            <h2 className="font-medium text-xl mb-4">Next steps</h2>
-            {hasEnvVars ? <SignUpUserSteps /> : <ConnectSupabaseSteps />}
-          </main>
-        </div>
+  const [user, setUser] = useState<any>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [text, setText] = useState('');
 
-        <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">
-          <p>
-            Powered by{" "}
-            <a
-              href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
-              target="_blank"
-              className="font-bold hover:underline"
-              rel="noreferrer"
-            >
-              Supabase
-            </a>
-          </p>
-          <ThemeSwitcher />
-        </footer>
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setUser(data.user);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    supabase
+      .from('tasks')
+      .select('*')
+      .eq('owner_id', user.id)
+      .then(({ data }) => {
+        setTasks(data || []);
+      });
+
+    const channel = supabase
+      .channel('realtime:tasks')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `owner_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const task = payload.new as Task;
+          setTasks((prev) => {
+            const without = prev.filter((t) => t.id !== task.id);
+            return [...without, task];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [user]);
+
+  const addTask = async () => {
+    if (!text.trim()) return;
+    await supabase.from('tasks').insert({
+      content: text.trim(),
+      owner_id: user.id,
+    });
+    setText('');
+  };
+
+  const toggleTask = async (id: string, completed: boolean) => {
+    await supabase.from('tasks').update({ completed }).eq('id', id);
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
+
+  const login = async () => {
+    const email = prompt('Enter your email:');
+    if (!email) return;
+    await supabase.auth.signInWithOtp({ email });
+    alert('Check your email for the magic link');
+  };
+
+  if (!user)
+    return (
+      <div style={{ padding: 40, textAlign: 'center' }}>
+        <h2>QuickSync List</h2>
+        <button onClick={login}>Sign In with Email</button>
       </div>
-    </main>
+    );
+
+  return (
+    <div style={{ padding: 40, maxWidth: 600, margin: 'auto', fontFamily: 'sans-serif' }}>
+      <h2>📝 QuickSync List</h2>
+      <button onClick={logout} style={{ float: 'right' }}>
+        Logout
+      </button>
+      <div style={{ marginTop: 40 }}>
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Add a new task..."
+          style={{ width: '70%', padding: 8 }}
+        />
+        <button onClick={addTask} style={{ marginLeft: 10 }}>
+          Add
+        </button>
+      </div>
+      <ul style={{ marginTop: 30 }}>
+        {tasks.map((task) => (
+          <li key={task.id}>
+            <label>
+              <input
+                type="checkbox"
+                checked={task.completed}
+                onChange={(e) => toggleTask(task.id, e.target.checked)}
+              />
+              <span style={{ textDecoration: task.completed ? 'line-through' : 'none', marginLeft: 8 }}>
+                {task.content}
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
+
