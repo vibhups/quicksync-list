@@ -105,6 +105,11 @@ export default function Home() {
     }
   };
 
+  const deleteTask = async (id: string) => {
+    await supabase.from('tasks').delete().eq('id', id);
+    setTasks((prev) => prev.filter((task) => task.id !== id));
+  };
+
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -151,20 +156,20 @@ export default function Home() {
 
       {user && (
         <>
-          <button
-            onClick={logout}
-            style={{
-              float: 'right',
-              padding: '5px 15px',
-              border: '1px solid #ccc',
-              backgroundColor: '#fff',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              marginBottom: '1rem',
-            }}
-          >
-            Logout
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+            <button
+              onClick={logout}
+              style={{
+                padding: '5px 15px',
+                border: '1px solid #ccc',
+                backgroundColor: '#fff',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Logout
+            </button>
+          </div>
 
           <div style={{ display: 'flex', marginBottom: '1.5rem' }}>
             <input
@@ -197,8 +202,16 @@ export default function Home() {
 
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {tasks.map((task) => (
-              <li key={task.id} style={{ marginBottom: '10px' }}>
-                <label style={{ display: 'flex', alignItems: 'center' }}>
+              <li
+                key={task.id}
+                style={{
+                  marginBottom: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
                   <input
                     type="checkbox"
                     checked={task.completed}
@@ -214,6 +227,23 @@ export default function Home() {
                     {task.content}
                   </span>
                 </label>
+
+                {task.completed && (
+                  <button
+                    onClick={() => deleteTask(task.id)}
+                    style={{
+                      marginLeft: '10px',
+                      padding: '5px 10px',
+                      border: 'none',
+                      backgroundColor: '#dc3545',
+                      color: 'white',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
               </li>
             ))}
           </ul>
