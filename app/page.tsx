@@ -18,6 +18,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [text, setText] = useState('');
 
+  // Handle auth state
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) setUser(data.user);
@@ -32,6 +33,7 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Load tasks and listen for realtime updates
   useEffect(() => {
     if (!user) return;
 
@@ -88,13 +90,14 @@ export default function Home() {
     const email = prompt('Enter your email:');
     if (!email) return;
     await supabase.auth.signInWithOtp({ email });
-    alert('Check your email for the magic link');
+    alert('Check your email for the magic login link.');
   };
 
   if (!user)
     return (
       <div style={{ padding: 40, textAlign: 'center' }}>
         <h2>QuickSync List</h2>
+        <p>Sign in to continue</p>
         <button onClick={login}>Sign In with Email</button>
       </div>
     );
@@ -119,7 +122,7 @@ export default function Home() {
       </div>
       <ul style={{ marginTop: 30 }}>
         {tasks.map((task) => (
-          <li key={task.id}>
+          <li key={task.id} style={{ marginBottom: 10 }}>
             <label>
               <input
                 type="checkbox"
@@ -136,4 +139,3 @@ export default function Home() {
     </div>
   );
 }
-
