@@ -20,28 +20,35 @@ export default function Home() {
   const [text, setText] = useState('');
 
   useEffect(() => {
+    let isMounted = true;
+
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setUser(data.user);
+      if (data.user && isMounted) setUser(data.user);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      if (isMounted) setUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
     if (!user) return;
+
+    let ignore = false;
 
     supabase
       .from('tasks')
       .select('*')
       .eq('owner_id', user.id)
       .then(({ data }) => {
-        setTasks(data || []);
+        if (!ignore) setTasks(data || []);
       });
 
     const channel = supabase
@@ -64,7 +71,10 @@ export default function Home() {
       )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      ignore = true;
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const addTask = async () => {
