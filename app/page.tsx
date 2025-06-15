@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
+import { User } from '@supabase/supabase-js';
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,11 +15,10 @@ type Task = {
 };
 
 export default function Home() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [text, setText] = useState('');
 
-  // Handle auth state
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) setUser(data.user);
@@ -33,7 +33,6 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load tasks and listen for realtime updates
   useEffect(() => {
     if (!user) return;
 
@@ -69,7 +68,7 @@ export default function Home() {
   }, [user]);
 
   const addTask = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() || !user) return;
     await supabase.from('tasks').insert({
       content: text.trim(),
       owner_id: user.id,
@@ -97,7 +96,6 @@ export default function Home() {
     return (
       <div style={{ padding: 40, textAlign: 'center' }}>
         <h2>QuickSync List</h2>
-        <p>Sign in to continue</p>
         <button onClick={login}>Sign In with Email</button>
       </div>
     );
@@ -122,7 +120,7 @@ export default function Home() {
       </div>
       <ul style={{ marginTop: 30 }}>
         {tasks.map((task) => (
-          <li key={task.id} style={{ marginBottom: 10 }}>
+          <li key={task.id}>
             <label>
               <input
                 type="checkbox"
